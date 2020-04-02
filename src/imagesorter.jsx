@@ -1,200 +1,288 @@
 import React, { Component } from "react";
 import ReactDOM from "react-dom";
+import ErrorBoundary from "./errorboundry.jsx";
+
 import "./styles.css";
+import "./slick.css";
+import "./slick-theme.css";
 
 import DropboxChooser from 'react-dropbox-chooser';
+import { HeartFill, XSquareFill } from 'react-bootstrap-icons';
 
-import Carousel from 'react-bootstrap/Carousel';
-import Button from 'react-bootstrap/Button';
-import Alert from 'react-bootstrap/Alert';
-import Form from 'react-bootstrap/Form';
+import Slider from "react-slick";
+import {Button, Alert, Form} from 'react-bootstrap';
+
 
 const APP_KEY = "h9fot2c8bxz7gcg";
 const URL = "http://localhost:3001";	
 const AUTH = "Bearer RvRO6h55szQAAAAAAAH2txU3jqcMgYHn-zdktTsTEKrHG39t0xdEjuUk-MxXr7Fy"
 
+const settings = {dots: true,infinite: true,speed: 500,slidesToShow: 1,slidesToScroll: 1,loading: false};
+	
 class ImageSwiper extends React.Component {	
+
 	constructor(props) {
 		super(props);			
 				
-		this.moveFile = this.moveFile.bind(this);
-		this.OnSubmit = this.onSubmit.bind(this);
-		this.onSuccess = this.onSuccess.bind(this);
+		this.getLocalFiles = this.getLocalFiles.bind(this);
+		this.setFromFolder = this.setFromFolder.bind(this);
+		this.loadScreen = this.loadScreen.bind(this);
+		this.rebuildSet = this.rebuildSet.bind(this);		
+		this.submitToFolder = this.submitToFolder.bind(this);
+		this.getFiles = this.getFiles.bind(this);
 		this.onCancel = this.onCancel.bind(this);
-		this.showAlert = this.showAlert.bind(this);
 		this.fillCarousel = this.fillCarousel.bind(this);
-		
+		this.foundFolders = this.foundFolders.bind(this);
+		this.setFiles = this.setFiles.bind(this);		
 				
 		this.state = {
-			fromFolder:"Select Folder  Location",
-			toFolder:"",
-			images:[],
-			waiting : false,
-			ready: false,
-			name:""
+			fromFolder: null,
+			toFolder: null,
+			finished: false,
+			loading: false,
+			files:[],
+			carousel:[],
+			hasError:false
 		}
 	}	
 	
-	async moveFile(e) {
-		let file;
-		let index = e.target.value;
-		let newSet = new Array();		
-		if(e.target)
-			file = this.state.images[e.target.value];		
-		else 
-			file=this.state.images[e.value];		
-			
-		let url = file.link.replace("?dl=0","?dl=1");
+	rebuildSet(data) 	
+	{	
+		console.log("rebuildSet");			
+		this.loadScreen(true);
 		
-		fetch(URL + '/api/imageData?id=' + encodeURIComponent(file.id), {method: "POST"})
-			.then( res => 	{
-				return res.json();
-			})
-			.then( data => {
-				fetch(URL + '/api/moveImage?fileName=' + encodeURIComponent(data.name) +'&toFolder='+ this.state.toFolder+'&fromFolder='+encodeURIComponent(data.path_display), {method: "GET"})
-				.then( res => {					
-					for(let i=0;i<this.state.images.length;i++)
-					{
-						if(i!=index)
-							newSet.push(this.state.images[i]);
-					}
+		fetch(URL + '/api/moveFile?name=' + data.result.name +'&toFolder=' + this.state.toFolder + '&fromFolder=' + this.state.fromFolder, {method: "POST"})
+		.then( res => { return res.json(); })
+		.then( data => {						
+			console.log('Moved ' + data.name);
+			let newList = this.state.files.replace(data.id + ',', '');
+			this.setState({files:newList});
+			this.setState({carousel:[]});
+			this.setState({finished:false});
+			localStorage.setItem('fileIDs',newList);
+			this.fillCarousel();
+			this.loadScreen(false);
+		});
+	}
+	
+	checkForFolders(){
+		console.log("checkForFolders");
+		const to = localStorage.getItem("fromFolder");
+		const from = localStorage.getItem("toFolder");		
+		const fileIDs = localStorage.getItem('fileIDs');		
+		const found = (to!=null && from !=null && fileIDs != null);		
+		
+		this.setState({fromFolder:from});
+		this.setState({toFolder:to});
+		
+		if(found) this.getFiles(fileIDs);			
+	}
+	
+	getLocalFiles() {
+		this.setState({fromFolder:localStorage.getItem("fromFolder")});
+		this.setState({toFolder:localStorage.getItem("toFolder")});		
+		this.setState({files:localStorage.getItem("fileIDs")});
+	}
+	
+	fillCarousel(){				
+		if(!this.state.finished)
+		{	
+			this.setState({finished:true});
+			if(typeof this.state.files === 'string')
+			{				
+				if(this.state.files === '')
+				{	
+					if(this.loadScreen != null)
+						this.loadScreen(true);
 					
-					this.setState({images:newSet});
-				});
-			});
-			
-			this.setState({name:file.name});			
-			this.showAlert(true);
-	}
+					fetch(URL + '/api/folderData?fromFolder=' + this.state.fromFolder, {method: "POST"})
+					.then( res => 	{ return res.json(); })
+					.then( data => { 									
+						let newIDs='';						
+						data.forEach(el => newIDs+=(el.id)+',');
+						localStorage.setItem("fileIDs", newIDs);
+						this.setState({files:newIDs});		
+						this.loadScreen(false);						
+					})
+				}
+				else
+				{
+					console.log('fillCarousel');	
+					
+					if(this.loadScreen != null)
+						this.loadScreen(true);
+					
+					fetch(URL + '/api/batchMetaData?fileIDs=' + this.state.files, {method: "POST"})
+					.then( res => 	{ return res.json(); })
+					.then( data => { 
+						let carousel=[];
+						for(let i in data){
+							let url = data[i].result.preview_url.replace('dl=0','dl=1');;
+							carousel.push(<div id="item" key={i}><img className="d-block center" src={url} alt={data[i].result.name}/><h3 id="caption">{data[i].result.name}</h3><div id='buttonsDiv'><Button id='yesButton' className="actionButton" value={i} onClick={()=>this.rebuildSet(data[i])} block><HeartFill></HeartFill></Button><Button id='noButton' onClick={()=>this.rebuildSet(data[i])} variant="danger"><XSquareFill></XSquareFill></Button></div></div>);
+						}			
+						
+						this.setState({carousel:carousel});					
+						this.loadScreen(false);
+					});		
+				}
+			}
+			else
+			{
+				if(this.state.fromFolder === null){
+				setTimeout(()=>{
+					this.getLocalFiles();
+					this.setState({finished:false});
+					this.fillCarousel();
+				}, 3000);
+			}
+			}
+		}		
+		else
+		{
+			if(this.state.fromFolder === null){
+				setTimeout(()=>{
+					this.getLocalFiles();
+				}, 3000);
+			}
+		}		
+	}	
 	
-	fillCarousel(){
-		let carousel = [];
-		let imgs = this.state.images;		
-		
-		for(let i=0;i<imgs.length;i++){
-			let img = imgs[i].link.replace("?dl=0","?dl=1");
-			carousel.push(<Carousel.Item id="item" key={i}><img className="d-block center" src={img} alt={imgs[i].name}/><Carousel.Caption id="caption"><h3>{imgs[i].name}</h3><Button className="actionButton" value={i} onClick={this.moveFile} block>Keep</Button></Carousel.Caption><Button variant="danger">Delete</Button></Carousel.Item>);
-			document.getElementById('carousel').style.visibility = "visible";
-		}	
-		
-		return carousel;
-	}
-	
-	onCancel(){
+	onCancel() {
 		alert("Canceled");
 	}
 	
-	onSuccess(files){		
-		this.setState({images:files});		
-		fetch(URL + '/api/imageData?id=' + encodeURIComponent(files[0].id), {method: "POST"})
-			.then( res => 	{
-				return res.json();
-			})
-			.then( data => {
-				let first=0;
-				let second=0;
-				let str = data.path_display;
-				
-				for(let i=0;i<str.length;i++){
-					let j = str[i].indexOf('/');					
-					if(j!=-1)
-					{
-						if(i<first)
-							first=i;
-						if(i>second)
-							second=i;
-					}
-				}								
-				
-				this.setState({fromFolder:str.substring(first, second+1)});						
-			});
+	setFromFolder(fileSet) {
+		console.log("setFromFolder");				
+		let from = localStorage.getItem("fromFolder");
+		this.loadScreen(true);
+		if(typeof fileSet === "object")
+			from = fileSet[0].id;			
+		if(from === null)
+			from = fileSet[0].id;		
 			
-			this.setState({ready:true});
-	}	
-	
-	showAlert(yes) {
-		let alert = document.getElementById('alert');
-		let name = this.state.name;
-		if(yes)
-		{
-			alert.classList.remove("invisble");
-			alert.innerHTML =  "${name} was saved!";
-		}
-		else 
-		{
-			alert.classList.add("invisible");			
-			alert.innerHTML = "";
-		}
+		fetch(URL + '/api/metaData?id=' + from, {method: "POST"})
+		.then( res => 	{ return res.json(); })
+		.then( data => {		
+			const from = data.path_display.replace(data.name,"");			
+			localStorage.setItem("fromFolder",from);
+			this.setState({fromFolder:from});
+			this.setFiles(fileSet);
+			this.loadScreen(false);
+		});				
 	}
 	
-	onSubmit(e) {
-		let newFolder = document.getElementById("formControl").value;
-		fetch(URL + '/api/addFolder?toFolder=' + encodeURIComponent(newFolder), {method: "GET"})
-		.then( res => 	{
-				return res.json();
-			})
-			.then( data => {			
-			console.log(data);
-				if(res.status===200)
-				{
-					if(newFolder[0].indexOf('/')===-1)
-						newFolder = '/' + newFolder;
-
-					this.setState({toFoler:newFolder});
-					let el = document.getElementById('noFolderForm');
-					el.setAttribute("className","invisible");
-				}
+	setFiles(files)
+	{		
+		console.log('setFiles');		
+		let savedSet="";		
+		files.forEach(el => savedSet += el.id + ',');						
+		localStorage.setItem("fileIDs", savedSet);
+		this.getFiles(savedSet)
+		this.setState({files:savedSet});		
+	}
+	
+	getFiles(files){	
+		console.log("getFiles");				
+		this.loadScreen(true);
+		const ids = files.split(',');
+		this.setState({files:ids});
+	}	
+	
+	submitToFolder(e) {						
+		console.log("submitToFolder");		
+		this.loadScreen(true);
+		let newFolder = document.getElementById("formControl").value;		
+		fetch(URL + '/api/find?item=' + newFolder, {method: "POST"})
+		.then( res => 	{ return res.json(); })
+		.then( data => {			
+			if(data.indexOf("metadata") === -1){
+				console.log("addFolder");
+				fetch(URL + '/api/addFolder?toFolder=' + newFolder, {method: "POST"})
+				.then( res => 	{ return res.json(); })
+				.then( data => { 
+					alert("Folder Added"); 
+					this.loadScreen(false)
+					localStorage.setItem("toFolder",newFolder);
+					this.setState({toFolder,newFolder});
+					this.setState({loading:false});
+				});
 			}
-			
-		)
+			else
+			{
+				console.log("Folder found");	
+				localStorage.setItem("toFolder",newFolder);						
+				data = JSON.parse(data);								
+				this.setState({toFolder:data[0].metadata.metadata.path_display});
+				this.loadScreen(false)
+			}		
+		});		
 	}
 	
 	componentDidMount(){
+		console.log("componentDidMount");		
+		this.getLocalFiles();
 	}
+  
+  loadScreen(isOn){	  
+	if(this.state.loading != isOn)
+		this.setState({loading:isOn});
+  }
+  
+  foundFolders() {
+	  console.log('foundFolders');
+	  const from = localStorage.getItem('fromFolder');
+	  const to = localStorage.getItem('toFolder');
 	  
-	componentWillUnmount() {		
-	}	
+	  this.setState({fromFolder:from});
+	  this.setState({toFolder:to});
+	  
+	  return (from!=null && to!=null);
+  }
 	
 	render() {
-		const items=[];
-		
-		return (<div>			
-			{this.state.toFolder==="" &&
-				<div id="noFolderForm">
-					<Form onSubmit={this.onSubmit}>
-						<Form.Group id="formGroup" controllid="formNewFolder">
-							<Form.Label>Enter New Folder</Form.Label>
-							<Form.Control type="text" id="formControl" />
-							<Form.Text className="text-muted">Any image you choose to keep will be moved to this folder.</Form.Text>
-						</Form.Group>
-						<Button id="formButton" variant="primary" type="submit">Submit</Button>
-					</Form>
-				</div>
-			}
-				<div>
-				{this.state.toFolder !="" && <h1>Saving to {this.state.toFolder}</h1>}
-					<DropboxChooser 
-						appKey={APP_KEY}
-						success={files => this.onSuccess(files)}
-						cancel={() => this.onCancel()}
-						multiselect={true} 
-						extensions={["images"]}
-						folderselect={true}
-						>
-						<Button size="lg" variant="success" className="dropbox-button" block>{this.state.fromFolder}</Button>							
-					</DropboxChooser>
-
-					<Alert key="1Alert" variant="success" id="alert" className="invisible" onClose={() => this.showAlert(false)} dismissible>You have kept {this.state.name}</Alert>
-					{this.state.images.length < 1 && <h1>This Folder Is Empty</h1>}
-							
-					<div id="carousel">
-						
-						<Carousel indicators={false}>
-							{this.fillCarousel()}
-						</Carousel>
+		return (		
+		<div>			
+		<ErrorBoundary>
+			{this.state.loading===true
+				&&	<div id="loadScreen">
+						<h1>Loading...</h1>
 					</div>
+			}
+			{typeof this.state.toFolder != 'string'				
+				&&	<div id="noFolderForm">					
+						<div id="formGroup" controllid="formNewFolder">
+							<h2>Type Name Of Folder To Keep Likes</h2>
+							<h1>toFolder</h1>
+							<input type="text" id="formControl"/>
+							<p className="text-muted">Any image you choose to keep will be moved to this folder.</p>
+						</div>
+						<Button id="formButton" variant="primary" type="submit" onClick={this.submitToFolder}>Submit</Button>					
+					</div>	
+			}
+			
+			{typeof this.state.fromFolder != 'string'
+				&& <div>			
+					<DropboxChooser 				
+					appKey={APP_KEY}
+					success={files => this.setFromFolder(files)}
+					cancel={() => this.onCancel()}
+					multiselect={true} 
+					extensions={["images"]}
+					folderselect={true}>
+					<Button size="lg" variant="primary" className="dropbox-button" block>Choose a Folder to Move From</Button>							
+				</DropboxChooser></div>
+			}					
+			
+			{this.state.files != null
+			 && <div id='carousel'>
+					{this.fillCarousel()}
+					<Slider {...settings} id='SliderMain'>
+						{this.state.carousel}
+					</Slider>
 				</div>
-      </div>);
+			}			
+			</ErrorBoundary>
+		</div>);		
 	}
 }
 

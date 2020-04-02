@@ -8,7 +8,7 @@
     "extends": "react-app"
   },
   "scripts": {
-    "start": "webpack-dev-server --config ./webpack.config.js --mode development",
+    "start": "webpack-dev-server --config ./webpack.config.js --mode development",	
     "server": "node-env-run server --exec nodemon | pino-colada",
     "dev": "run-p server start",
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -36,14 +36,18 @@
     "@babel/cli": "^7.8.4",
     "@babel/polyfill": "^7.8.7",
     "axios": "^0.19.2",
+    "core-js": "^3.6.4",
     "css-loader": "^3.2.0",
     "downloadjs": "^1.4.7",
     "file-loader": "^4.2.0",
     "image-downloader": "^3.5.0",
     "react": "^16.13.1",
     "react-bootstrap": "^1.0.0-beta.14",
+    "react-bootstrap-icons": "^1.0.1-alpha3",
     "react-dom": "^16.13.1",
     "react-dropbox-chooser": "0.0.5",
+    "react-slick": "^0.25.2",
+    "slick-carousel": "^1.8.1",
     "style-loader": "^1.0.0",
     "xmlhttprequest": "^1.8.0"
   }

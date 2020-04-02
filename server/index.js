@@ -1,7 +1,7 @@
 const XMLHttpRequest = require("xmlhttprequest").XMLHttpRequest;
 const http = require('https')
 const fs = require('fs');
-const download = require('image-downloader')
+//const download = require('image-downloader')
 const express = require('express');
 const bodyParser = require('body-parser');
 const pino = require('express-pino-logger')();
@@ -14,158 +14,207 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 app.use(pino);
 
-app.post('/api/imageData', (request, response) => {	
-	console.log('imageData');
+app.post('/api/find', (request, response) => {				
+	console.log('find');	
+	let item = request.query.item;	
 	
-	response.header('Access-Control-Allow-Origin', '*');
-	response.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-	response.header('Access-Control-Request-Method', 'GET, POST, DELETE, PUT, OPTIONS');	
-	
-	async function getInfo(){
-		try {
-			const res = await axios.post(
-				'https://api.dropboxapi.com/2/files/get_metadata',
-				{ 	"path" : request.query.id,
-					"include_media_info" : false,
-					"include_deleted" : false,
-					"include_has_explicit_shared_members" : false 
-				},
-				{
-					headers: {
-						'Access-Control-Allow-Origin' : '*',
-						'Access-Control-Allow-Headers' : 'Origin, X-Requested-With, Content-Type, Accept, Authorization',
-						'Access-Control-Request-Method' : 'GET, POST, DELETE, PUT, OPTIONS',
-						'Content-Type' : 'application/json' , 
-						'Authorization' : AUTH
-					}
-				}
-			);		
-			
-			let arr = res.data;
-			delete arr[".tag"];
-			response.json(arr);			
-		}
-		catch(error) {
-			console.log(error);
-		}
-	}
-	
-	getInfo();
-});
-
-app.get('/api/moveImage', (request, response) => {	
 	response.setHeader('Access-Control-Allow-Origin', '*');
 	response.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-	response.setHeader('Access-Control-Request-Method', 'GET, POST, DELETE, PUT, OPTIONS')		
+	response.setHeader('Access-Control-Request-Method', 'GET, POST, DELETE, PUT, OPTIONS');
+	response.setHeader("Set-Cookie", "HttpOnly;Secure;SameSite=Strict");	
 	
-	async function move(){
-		try {
-			const res = await axios.post(
-				'https://api.dropboxapi.com/2/files/move_v2',
-				{
-					"from_path": request.query.fromFolder,
-					"to_path": request.query.toFolder + "/" + request.query.fileName,
-					"allow_shared_folder": false,
-					"autorename": true,
-					"allow_ownership_transfer": false
-				},
-				{
-					headers: {
-						'Access-Control-Allow-Origin' : '*',
-						'Access-Control-Allow-Headers' : 'Origin, X-Requested-With, Content-Type, Accept, Authorization',
-						'Access-Control-Request-Method' : 'GET, POST, DELETE, PUT, OPTIONS',
-						'Content-Type' : 'application/json' , 
-						'Authorization' : AUTH
-					}
-				}
-			);		
-			
-			response.end();
-		}
-		catch(error) {
-			console.log(error);
-		}
-	}
-	
-	move();
+	axios({
+	  method: 'post',
+	  url: 'https://api.dropboxapi.com/2/files/search_v2',
+	  data: {
+		query: item,
+		include_highlights: false
+	  },
+	  headers: {
+		'Content-Type' : 'application/json' , 
+		'Authorization' : AUTH
+	  }
+	})
+	.then(function (res) {
+		console.log(res);		
+		let data = res.data.matches;
+		response.json(JSON.stringify(data));
+		response.end();			
+	})
+	.catch(function (error) {
+		console.log(error);
+	});
 });
 
-app.get('/api/addFolder', (request, response) => {		
-	
-	console.log('addFolder');
-	
+app.post('/api/addFolder', (request, response) => {
+	console.log('addFolder');	
 	let newFolder = request.query.toFolder;	
 	
 	if(newFolder[0].indexOf('/')===-1)
 		newFolder = '/' + newFolder;
 	
-	async function createFolder(){
-		try {
-			const res = await axios.post(
-			'https://api.dropboxapi.com/2/files/create_folder_v2',
-			{
-				"path": newFolder,
-				"autorename": false
-			},
-			{
-				headers: {
-					'Access-Control-Allow-Origin' : '*',
-					'Access-Control-Allow-Headers' : 'Origin, X-Requested-With, Content-Type, Accept, Authorization',
-					'Access-Control-Request-Method' : 'GET, POST, DELETE, PUT, OPTIONS',
-					'Content-Type' : 'application/json' , 
-					'Authorization' : AUTH
-				}
-			});		
-			
-			response.send();
-		}
-		catch(error) {
-			console.log(error);
-		}
-	}
-	
-	createFolder();
-});
-
-app.get('/api/removeImage', (request, response) => {	
 	response.setHeader('Access-Control-Allow-Origin', '*');
 	response.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
 	response.setHeader('Access-Control-Request-Method', 'GET, POST, DELETE, PUT, OPTIONS');	
-		
+	response.setHeader("Set-Cookie", "HttpOnly;Secure;SameSite=Strict");
 	
-	let data = {path:request.query.url};	
-	
-	let json = JSON.stringify(data);
-	let xhr = new XMLHttpRequest();
-    xhr.open("POST", "https://api.dropboxapi.com/2/files/delete_v2");
-    xhr.setRequestHeader("Content-Type", "application/json");
-	xhr.setRequestHeader("Authorization", AUTH);
-    xhr.send(json);	
-	
-	response.send();
+	axios({
+	  method: 'post',
+	  url: 'https://api.dropboxapi.com/2/files/create_folder_v2',
+	  data: {
+		path: newFolder,
+		autorename: false
+	  },
+	  headers: {
+		'Content-Type' : 'application/json' , 
+		'Authorization' : AUTH
+	  }
+	})
+	.then(function (res) {
+		console.log(res);		
+		let data = res.data.metadata;
+		response.json(data);
+		response.end();			
+	})
+	.catch(function (error) {
+		console.log(error);
+	});	
 });
 
-app.get('/api/getImage', (request, response) => {  	
+app.post('/api/metaData', (request, response) => {	
+	console.log('metaData');	
+	
 	response.setHeader('Access-Control-Allow-Origin', '*');
 	response.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-	response.setHeader('Access-Control-Request-Method', 'GET, POST, DELETE, PUT, OPTIONS');		
+	response.setHeader('Access-Control-Request-Method', 'GET, POST, DELETE, PUT, OPTIONS');	
+	response.setHeader("Set-Cookie", "HttpOnly;Secure;SameSite=Strict");
 	
-	const options = {
-	  url: request.query.url,
-	  dest: '\saved'
-	}
- 
-	async function downloadIMG() {
-	  try {
-		const { filename, image } = await download.image(options);
-		console.log(filename);		
-		response.send();
-	  } catch (e) {
-		console.error(e)
+	axios({
+	  method: 'post',
+	  url: 'https://api.dropboxapi.com/2/files/get_metadata',
+	  data: {
+		path : request.query.id,
+		include_media_info : false,
+		include_deleted : false,
+		include_has_explicit_shared_members : false 
+	  },
+	  headers: {
+		'Content-Type' : 'application/json' , 
+		'Authorization' : AUTH
 	  }
-	}
-	 
-	downloadIMG()
+	})
+	.then(function (res) {
+		response.json(res.data);	
+	})
+	.catch(function (error) {
+		console.log(error);
+	});	
+});
+
+app.post('/api/folderData', (request, response) => {	
+	console.log('folderData');
+	
+	response.setHeader('Access-Control-Allow-Origin', '*');
+	response.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+	response.setHeader('Access-Control-Request-Method', 'GET, POST, DELETE, PUT, OPTIONS');	
+	response.setHeader("Set-Cookie", "HttpOnly;Secure;SameSite=Strict");
+	//response.setHeader("Range", "HttpOnly;Secure;SameSite=Strict");
+	
+	axios({
+	  method: 'post',
+	  url: 'https://api.dropboxapi.com/2/files/list_folder',
+	  data: {
+			"path": request.query.fromFolder,
+			"recursive": false,
+			"include_media_info": false,
+			"include_deleted": false,
+			"include_has_explicit_shared_members": false,
+			"include_mounted_folders": true,
+			"include_non_downloadable_files": true
+		},
+	  headers: {
+		'Content-Type' : 'application/json' , 
+		'Authorization' : AUTH
+	  }
+	})
+	.then(function (res) {
+		console.log(res);		
+		let data = res.data.entries.slice(0,20);
+		response.json(data);
+		response.end();			
+	})
+	.catch(function (error) {
+		console.log(error);
+	});	
+});
+
+app.post('/api/batchMetaData', (request, response) => {	
+	console.log('bathMetaData');		
+	let idArr = request.query.fileIDs.split(",");
+	for(let i in idArr)
+		idArr[i] = "\"" + idArr[i].concat("\"");	
+	idArr.pop();
+			
+	let ids = '{"files":['+idArr.toString()+']}';
+	ids = JSON.parse(ids);
+	//console.log(ids);
+	
+	response.setHeader('Access-Control-Allow-Origin', '*');
+	response.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+	response.setHeader('Access-Control-Request-Method', 'GET, POST, DELETE, PUT, OPTIONS');	
+	response.setHeader("Set-Cookie", "HttpOnly;Secure;SameSite=Strict")
+	
+	axios({
+	  method: 'post',
+	  url: 'https://api.dropboxapi.com/2/sharing/get_file_metadata/batch',	 
+	  data:	ids,
+	  headers: {
+		'Content-Type':'application/json',
+		'Authorization' : AUTH
+	  }
+	})
+	.then(function (res) {		
+		console.log(res.data);
+		response.json(res.data);
+	})
+	.catch(function (error) {
+		console.log(error);
+	});		
+});
+
+app.post('/api/moveFile', (request, response) => {	
+	response.setHeader('Access-Control-Allow-Origin', '*');
+	response.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+	response.setHeader('Access-Control-Request-Method', 'GET, POST, DELETE, PUT, OPTIONS')		
+	response.setHeader("Set-Cookie", "HttpOnly;Secure;SameSite=Strict");
+	
+	const name = request.query.name;
+	const from = request.query.fromFolder + name;
+	const to = '/' + request.query.toFolder + '/' + name;
+	
+	axios({
+	  method: 'post',
+	  url: 'https://api.dropboxapi.com/2/files/move_v2',
+	  data: {
+		from_path: from,
+		to_path: to,
+		allow_shared_folder: false,
+		autorename: true,
+		allow_ownership_transfer: false
+	  },
+	  headers: {
+		'Content-Type' : 'application/json' , 
+		'Authorization' : AUTH
+	  }
+	})
+	.then(function (res) {	
+		let data = res.data.metadata;	
+		response.json(data);
+		response.end();
+	})
+	.catch(function (error) {
+		console.log(error);
+	});		
 });
 
 app.listen(PORT, () =>
