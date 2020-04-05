@@ -1,62 +1,65 @@
-h3 {
+h3 
+{
 	color:white;
 }
 
-#carousel {
-	
-}
-
-h1 {
+h1 
+{
 	text-align:center;
 }
 
-h2 {
+h2 
+{
 	text-align:center;
 	margin-top:100px;
 	color:yellow;
 }
 
-
-#item {
+#item 
+{
 	width:100% !important;
 }
 
-#item h2 {
+#item h2 
+{
 	text-align:center;
 }
 
-#buttonsDiv {
+#buttonsDiv 
+{
 	height:125px !important;
 	width: 100% !important;
 }
 
-#buttonsDiv button {
+#buttonsDiv button 
+{
 	display: inline;
 	height:100% !important;
 	width: 200px !important;
 	font-size:50px;
+	z-index:5;
 }
 
-#yesButton {
-	
-}
-
-#noButton {
+#noButton 
+{
 	float:right;
 }
 
-#formGroup {
+#formGroup 
+{
 	width:50%;
 	margin-left:25%;
 	margin-top:15%;
 }
 
-#formButton {
+#formButton 
+{
 	width:50%;
 	margin-left:25%;
 }
 
-#noFolderForm {
+#noFolderForm 
+{
 	position: fixed; /* Sit on top of the page content */	
 	width: 100%; /* Full width (cover the whole page) */
 	height: 100%; /* Full height (cover the whole page) */
@@ -69,12 +72,9 @@ h2 {
 	cursor: pointer; /* Add a pointer on hover */
 }
 
-#caption {
+#caption 
+{
 	text-align:center;
-}
-
-#item {
-	padding:20px;	
 }
 
 #loadScreen {
@@ -97,10 +97,9 @@ h2 {
 }
 
 .center {
-	padding-top:10px;
-	margin-left:auto;
-	margin-right:auto;
-	height:auto;
+	padding-top:75px;
+	display: block;
+    margin: 0 auto;
 }
 
 .invisible {
@@ -116,13 +115,20 @@ h2 {
 	padding: 15px 25px;
 }
 
-img {
-	width: auto !important;
-	height: auto !important;
-}
-
 #loadScreen {
 	display:block;
 	background:black;
 	z-index:10;
+}
+
+#login 
+{
+	text-align: center;
+	margin-top: 350px;
+}
+
+.Login button
+{
+	height: 75px;
+	width: 100px;
 }

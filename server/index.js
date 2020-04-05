@@ -1,18 +1,51 @@
 const XMLHttpRequest = require("xmlhttprequest").XMLHttpRequest;
 const http = require('https')
 const fs = require('fs');
-//const download = require('image-downloader')
 const express = require('express');
 const bodyParser = require('body-parser');
 const pino = require('express-pino-logger')();
+
 const PORT = process.env.PORT || 3000;
 const APP_KEY = process.env.APP_KEY;
+const URL = process.env.URL;
 const AUTH = process.env.AUTH;
+
 const app = express();
 const axios = require("axios");
+const stringifyObject = require('stringify-object');
+
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 app.use(pino);
+
+app.get('/api/login', (request, response) => 
+{
+	console.log('login');
+	response.setHeader('Access-Control-Allow-Origin', '*');
+	response.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+	response.setHeader('Access-Control-Request-Method', 'GET, POST, DELETE, PUT, OPTIONS');
+	response.setHeader("Set-Cookie", "HttpOnly;Secure;SameSite=Strict");
+	
+	axios({
+		method: 'get',
+		url: 'https://www.dropbox.com/oauth2/authorize?client_id=' + APP_KEY + '&response_type=code',
+		  headers: {
+			'Content-Type' : 'application/json' , 
+			'Authorization' : AUTH
+		  }
+	}).then(function (res) {	
+		let pretty = stringifyObject(res.data, {
+			singleQuotes: false
+		});			
+		
+		pretty = pretty.replace('<img data-js-component-id=\"component2094695769983672184\" width=\"36\" alt=\"Dropbox\" src=\"https://cfl.dropboxstatic.com/static/images/logo_catalog/blue_dropbox_glyph_m1-vflZvZxbS.png\" />', '<img data-js-component-id=\"component2094695769983672184\" width=\"36\" alt=\"Dropbox\" src=\"https://cfl.dropboxstatic.com/static/images/logo_catalog/blue_dropbox_glyph_m1-vflZvZxbS.png\" />');
+		
+		response.send(pretty);
+	})
+	.catch(function (error) {
+		response.send(error.response.data);
+	});		
+});
 
 app.post('/api/find', (request, response) => {				
 	console.log('find');	

@@ -1,29 +1,25 @@
 import React, { Component } from "react";
 import ReactDOM from "react-dom";
-import ErrorBoundary from "./errorboundry.jsx";
+import CarouselComponent from "./CarouselComponent";
 
-import "./styles.css";
 import "./slick.css";
 import "./slick-theme.css";
 
 import DropboxChooser from 'react-dropbox-chooser';
 import { HeartFill, XSquareFill } from 'react-bootstrap-icons';
-
 import Slider from "react-slick";
 import {Button, Alert, Form} from 'react-bootstrap';
 
+const URL = "http://localhost:3001";
+const sliderProps = {dots: false,infinite: true,speed: 500,slidesToShow: 1,slidesToScroll: 1,loading: false};
 
-const APP_KEY = "h9fot2c8bxz7gcg";
-const URL = "http://localhost:3001";	
-const AUTH = "Bearer RvRO6h55szQAAAAAAAH2txU3jqcMgYHn-zdktTsTEKrHG39t0xdEjuUk-MxXr7Fy"
-
-const settings = {dots: true,infinite: true,speed: 500,slidesToShow: 1,slidesToScroll: 1,loading: false};
-	
-class ImageSwiper extends React.Component {	
-
+class ImageSwiper extends React.Component 
+{	
 	constructor(props) {
 		super(props);			
-				
+		
+		this.logKey = this.logKey.bind(this);
+		this.buildHTML = this.buildHTML.bind(this);
 		this.getLocalFiles = this.getLocalFiles.bind(this);
 		this.setFromFolder = this.setFromFolder.bind(this);
 		this.loadScreen = this.loadScreen.bind(this);
@@ -38,34 +34,38 @@ class ImageSwiper extends React.Component {
 		this.state = {
 			fromFolder: null,
 			toFolder: null,
-			finished: false,
-			loading: false,
 			files:[],
 			carousel:[],
-			hasError:false
-		}
-	}	
+			hasError:false,
+			noFolder: 'UnwantedFiles',
+			count:0,
+			ready:false,
+			markup:<div></div>
+		}		
+		
+	}		
 	
-	rebuildSet(data) 	
-	{	
+	rebuildSet(data, toFolder) 	
+	{
 		console.log("rebuildSet");			
 		this.loadScreen(true);
 		
-		fetch(URL + '/api/moveFile?name=' + data.result.name +'&toFolder=' + this.state.toFolder + '&fromFolder=' + this.state.fromFolder, {method: "POST"})
+		fetch(URL + '/api/moveFile?name=' + data.result.name +'&toFolder=' + toFolder + '&fromFolder=' + this.state.fromFolder, {method: "POST"})
 		.then( res => { return res.json(); })
 		.then( data => {						
 			console.log('Moved ' + data.name);
 			let newList = this.state.files.replace(data.id + ',', '');
-			this.setState({files:newList});
-			this.setState({carousel:[]});
+
+			this.setState({files:newList});			
 			this.setState({finished:false});
 			localStorage.setItem('fileIDs',newList);
+			console.log("files size is " + this.state.files.length);
 			this.fillCarousel();
-			this.loadScreen(false);
 		});
 	}
 	
-	checkForFolders(){
+	checkForFolders()
+	{
 		console.log("checkForFolders");
 		const to = localStorage.getItem("fromFolder");
 		const from = localStorage.getItem("toFolder");		
@@ -78,16 +78,51 @@ class ImageSwiper extends React.Component {
 		if(found) this.getFiles(fileIDs);			
 	}
 	
-	getLocalFiles() {
+	getLocalFiles() 
+	{
 		this.setState({fromFolder:localStorage.getItem("fromFolder")});
 		this.setState({toFolder:localStorage.getItem("toFolder")});		
 		this.setState({files:localStorage.getItem("fileIDs")});
+	}	
+	
+	logKey(e) 
+	{
+		if(e.code === 'ArrowUp')
+		{			
+			const el = document.getElementById('yesButton');			
+			if(el != null)
+				this.rebuildSet(JSON.parse(el.value), this.state.toFolder)
+		}
+		
+		if(e.code === 'ArrowDown')
+		{			
+			const el = document.getElementById('noButton');
+			if(el!=null)
+				this.rebuildSet(JSON.parse(el.value), this.state.noFolder)
+		}
 	}
 	
-	fillCarousel(){				
+	buildHTML(data)
+	{
+		console.log(data);
+		let carousel=[];
+		let count=0;
+		for(let i in data){
+			let url = data[i];
+			if(data[i].result != null)
+				url = data[i].result.preview_url.replace('dl=0','dl=1');				
+			carousel.push(<CarouselComponent data={data[i]} />)
+		}			
+						
+		this.setState({count:count});
+		this.setState({carousel:carousel});		
+	}
+	
+	fillCarousel()
+	{
 		if(!this.state.finished)
 		{	
-			this.setState({finished:true});
+			this.setState({finished:true});			
 			if(typeof this.state.files === 'string')
 			{				
 				if(this.state.files === '')
@@ -100,9 +135,18 @@ class ImageSwiper extends React.Component {
 					.then( data => { 									
 						let newIDs='';						
 						data.forEach(el => newIDs+=(el.id)+',');
-						localStorage.setItem("fileIDs", newIDs);
+						localStorage.setItem("fileIDs", newIDs);						
 						this.setState({files:newIDs});		
-						this.loadScreen(false);						
+						
+						if(this.loadScreen != null)
+							this.loadScreen(true);
+					
+						fetch(URL + '/api/batchMetaData?fileIDs=' + this.state.files, {method: "POST"})
+						.then( res => 	{ return res.json(); })
+						.then( data => { 
+							this.buildHTML(data);
+							this.loadScreen(false);
+						});
 					})
 				}
 				else
@@ -115,43 +159,41 @@ class ImageSwiper extends React.Component {
 					fetch(URL + '/api/batchMetaData?fileIDs=' + this.state.files, {method: "POST"})
 					.then( res => 	{ return res.json(); })
 					.then( data => { 
-						let carousel=[];
-						for(let i in data){
-							let url = data[i].result.preview_url.replace('dl=0','dl=1');;
-							carousel.push(<div id="item" key={i}><img className="d-block center" src={url} alt={data[i].result.name}/><h3 id="caption">{data[i].result.name}</h3><div id='buttonsDiv'><Button id='yesButton' className="actionButton" value={i} onClick={()=>this.rebuildSet(data[i])} block><HeartFill></HeartFill></Button><Button id='noButton' onClick={()=>this.rebuildSet(data[i])} variant="danger"><XSquareFill></XSquareFill></Button></div></div>);
-						}			
-						
-						this.setState({carousel:carousel});					
+						this.buildHTML(data);
 						this.loadScreen(false);
 					});		
 				}
 			}
 			else
 			{
-				if(this.state.fromFolder === null){
-				setTimeout(()=>{
-					this.getLocalFiles();
-					this.setState({finished:false});
-					this.fillCarousel();
-				}, 3000);
-			}
+				if(this.state.fromFolder === null)
+				{
+					setTimeout(()=>{
+						this.getLocalFiles();
+						this.setState({finished:false});
+						this.fillCarousel();
+					}, 3000);
+				}
 			}
 		}		
 		else
 		{
-			if(this.state.fromFolder === null){
+			if(this.state.fromFolder === null)
+			{
 				setTimeout(()=>{
 					this.getLocalFiles();
 				}, 3000);
 			}
-		}		
+		}	
 	}	
 	
-	onCancel() {
+	onCancel() 
+	{
 		alert("Canceled");
-	}
+	}	
 	
-	setFromFolder(fileSet) {
+	setFromFolder(fileSet) 
+	{
 		console.log("setFromFolder");				
 		let from = localStorage.getItem("fromFolder");
 		this.loadScreen(true);
@@ -181,14 +223,16 @@ class ImageSwiper extends React.Component {
 		this.setState({files:savedSet});		
 	}
 	
-	getFiles(files){	
+	getFiles(files)
+	{	
 		console.log("getFiles");				
 		this.loadScreen(true);
 		const ids = files.split(',');
 		this.setState({files:ids});
 	}	
 	
-	submitToFolder(e) {						
+	submitToFolder(e) 
+	{						
 		console.log("submitToFolder");		
 		this.loadScreen(true);
 		let newFolder = document.getElementById("formControl").value;		
@@ -218,17 +262,21 @@ class ImageSwiper extends React.Component {
 		});		
 	}
 	
-	componentDidMount(){
-		console.log("componentDidMount");		
+	componentDidMount()
+	{
+		console.log("componentDidMount");			
 		this.getLocalFiles();
+		document.onkeydown = this.logKey;
 	}
   
-  loadScreen(isOn){	  
+  loadScreen(isOn)
+  {	  
 	if(this.state.loading != isOn)
 		this.setState({loading:isOn});
   }
   
-  foundFolders() {
+  foundFolders() 
+  {
 	  console.log('foundFolders');
 	  const from = localStorage.getItem('fromFolder');
 	  const to = localStorage.getItem('toFolder');
@@ -236,52 +284,57 @@ class ImageSwiper extends React.Component {
 	  this.setState({fromFolder:from});
 	  this.setState({toFolder:to});
 	  
-	  return (from!=null && to!=null);
-  }
+	  return (from!=null && to!=null);	
+	}
 	
-	render() {
-		return (		
-		<div>			
-		<ErrorBoundary>
-			{this.state.loading===true
-				&&	<div id="loadScreen">
-						<h1>Loading...</h1>
-					</div>
-			}
-			{typeof this.state.toFolder != 'string'				
-				&&	<div id="noFolderForm">					
-						<div id="formGroup" controllid="formNewFolder">
-							<h2>Type Name Of Folder To Keep Likes</h2>
-							<h1>toFolder</h1>
-							<input type="text" id="formControl"/>
-							<p className="text-muted">Any image you choose to keep will be moved to this folder.</p>
+	render() 
+	{			
+		return (
+		<div>
+			{this.state.markup}				
+				{	this.state.loading===true
+					&&	<div id="loadScreen">
+							<h1>Loading...</h1>
 						</div>
-						<Button id="formButton" variant="primary" type="submit" onClick={this.submitToFolder}>Submit</Button>					
-					</div>	
-			}
-			
-			{typeof this.state.fromFolder != 'string'
-				&& <div>			
-					<DropboxChooser 				
-					appKey={APP_KEY}
-					success={files => this.setFromFolder(files)}
-					cancel={() => this.onCancel()}
-					multiselect={true} 
-					extensions={["images"]}
-					folderselect={true}>
-					<Button size="lg" variant="primary" className="dropbox-button" block>Choose a Folder to Move From</Button>							
-				</DropboxChooser></div>
-			}					
-			
-			{this.state.files != null
-			 && <div id='carousel'>
-					{this.fillCarousel()}
-					<Slider {...settings} id='SliderMain'>
-						{this.state.carousel}
-					</Slider>
-				</div>
-			}			
-			</ErrorBoundary>
+				}
+				
+				{	typeof this.state.toFolder != 'string'						
+					&&	<div key="noFoldersForm" id="noFolderForm">					
+							<div id="formGroup" controllid="formNewFolder">
+								<h2>Type Name Of Folder To Keep Likes</h2>
+								<h1>toFolder</h1>
+								<input type="text" id="formControl"/>
+								<p className="text-muted">Any image you choose to keep will be moved to this folder.</p>
+							</div>
+							<Button id="formButton" variant="primary" type="submit" onClick={this.submitToFolder}>Submit</Button>					
+						</div>	
+				}
+				
+				{	typeof this.state.fromFolder != 'string'						
+					&& <div key="dropboxChooser">			
+						<DropboxChooser 				
+						appKey={this.props.APP_KEY}
+						success={files => this.setFromFolder(files)}
+						cancel={() => this.onCancel()}
+						multiselect={true} 
+						extensions={["images"]}
+						folderselect={true}>
+						<Button size="lg" variant="primary" className="dropbox-button" block>Choose a Folder to Move From</Button>							
+					</DropboxChooser></div>
+				}					
+				
+				{	this.state.files != null	
+					&&	<div key='carousel' id='carousel'>
+							<div>
+								<h1>Viewing {this.state.count} from {this.state.fromFolder}</h1>
+								<h1>to {this.state.toFolder}</h1>
+							</div>
+							{this.fillCarousel()}
+							<Slider {...sliderProps} id='SliderMain'>
+								{this.state.carousel}
+							</Slider>
+						</div>
+				}			
 		</div>);		
 	}
 }
